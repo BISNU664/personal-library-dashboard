@@ -23,8 +23,12 @@ interface SearchResult {
 function App() {
   const [books, setBooks] = useState<Book[]>([]);
   const [showModal, setShowModal] = useState(false);
+
+  const [editingBookId, setEditingBookId] = useState<number | null>(null);
+
   const [searchQuery, setSearchQuery] = useState("");
   const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
+  
 
   const [newBook, setNewBook] = useState({
     title: "",
@@ -46,31 +50,107 @@ function App() {
   const completedBooks = books.filter((book) => book.status === "Completed").length;
 
   const handleAddBook = () => {
-    const bookToAdd: Book = {
-      id: books.length + 1,
+    const bookToAdd = {
       title: newBook.title,
       author: newBook.author,
       status: newBook.status,
       pages: newBook.pages ? Number(newBook.pages) : 0,
       rating: Math.min(Number(newBook.rating), 6),
-      cover: newBook.cover || "/covers/default-cover.jpg",
+      cover: newBook.cover,
     };
 
-    setBooks([...books, bookToAdd]);
+    fetch("http://127.0.0.1:8000/books", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(bookToAdd),
+    })
+      .then((response) => response.json())
+      .then((createdBook) => {
+        setBooks([...books, createdBook]);
+
+        setNewBook({
+          title: "",
+          author: "",
+          status: "To Read",
+          pages: "",
+          rating: "",
+          cover: "",
+        });
+
+        setSearchQuery("");
+        setSearchResults([]);
+        setShowModal(false);
+      });
+  };
+
+  const handleUpdateBook = () => {
+    if (editingBookId === null) return;
+
+    const updatedBook = {
+      title: newBook.title,
+      author: newBook.author,
+      status: newBook.status,
+      pages: newBook.pages ? Number(newBook.pages) : 0,
+      rating: Math.min(Number(newBook.rating), 6),
+      cover: newBook.cover,
+    };
+
+    fetch(`http://127.0.0.1:8000/books/${editingBookId}`, {
+      method: "PUT",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(updatedBook),
+    })
+      .then((response) => response.json())
+      .then((savedBook) => {
+        setBooks(
+          books.map((book) =>
+            book.id === editingBookId ? savedBook : book
+          )
+        );
+
+        setEditingBookId(null);
+
+        setNewBook({
+          title: "",
+          author: "",
+          status: "To Read",
+          pages: "",
+          rating: "",
+          cover: "",
+        });
+
+        setShowModal(false);
+      });
+  };
+
+  const handleEditClick = (book: Book) => {
+    setEditingBookId(book.id);
 
     setNewBook({
-      title: "",
-      author: "",
-      status: "To Read",
-      pages: "",
-      rating: "",
-      cover: "",
+      title: book.title,
+      author: book.author,
+      status: book.status,
+      pages: String(book.pages),
+      rating: String(book.rating),
+      cover: book.cover,
     });
 
-    setSearchQuery("");
+    setSearchQuery(book.title);
     setSearchResults([]);
-    setShowModal(false);
+    setShowModal(true);
   };
+
+  const handleDeleteBook = (id: number) => {
+  fetch(`http://127.0.0.1:8000/books/${id}`, {
+    method: "DELETE",
+  }).then(() => {
+    setBooks(books.filter((book) => book.id !== id));
+  });
+};
 
   const handleSearchBooks = () => {
   if (!searchQuery.trim()) return;
@@ -121,17 +201,58 @@ function App() {
           <div className="section-header">
             <h2>My Books</h2>
             <p className="section-subtitle">Manage your current reading list.</p>
-            <button onClick={() => setShowModal(true)}>Add Book</button>
+            <button
+            onClick={() => {
+              setEditingBookId(null);
+
+              setNewBook({
+                title: "",
+                author: "",
+                status: "To Read",
+                pages: "",
+                rating: "",
+                cover: "",
+              });
+
+              setSearchQuery("");
+              setSearchResults([]);
+              setShowModal(true);
+            }}
+          >
+            Add Book
+          </button>
           </div>
 
           <div className="books-container">
             {books.map((book) => (
               <div className="book-card" key={book.id}>
+
+                <button
+                  className="delete-button"
+                  onClick={() => handleDeleteBook(book.id)}
+                >
+                <img 
+                  src="/covers/bin.png" 
+                  alt="Delete" 
+                />
+                </button>
+
+                <button
+                  className="edit-button"
+                  onClick={() => handleEditClick(book)}
+                >
+                  <img src="/covers/edit.png" 
+                  alt="Edit" />
+                </button>
+
                 <img src={book.cover} alt={book.title} className="book-cover" />
                 <h3>{book.title}</h3>
-                <p>{book.author}</p>
-                <p>{"⭐".repeat(book.rating)}</p>
-                <p>{book.pages > 0 ? `${book.pages} pages` : "Pages: unknown"}</p>
+                <p className="book-author">{book.author}</p>
+                <p className="book-rating">
+                  {"★".repeat(book.rating)}
+                  {"☆".repeat(6 - book.rating)}
+                </p>
+                <p>{book.pages > 0 ? `${book.pages} pages` : "—"}</p>
                 <span className={`status ${book.status.replace(" ", "-")}`}>
                   {book.status}
                 </span>
@@ -144,7 +265,7 @@ function App() {
 {showModal && (
   <div className="modal-overlay">
     <div className="modal">
-      <h2>Add New Book</h2>
+      <h2>{editingBookId ? "Edit Book" : "Add New Book"}</h2>
 
       <div className="search-section">
         <input
@@ -240,7 +361,15 @@ function App() {
       </select>
 
       <div className="modal-actions">
-        <button onClick={handleAddBook}>Add Book</button>
+        <button
+            onClick={
+                editingBookId
+                    ? handleUpdateBook
+                    : handleAddBook
+            }
+        >
+            {editingBookId ? "Save Changes" : "Add Book"}
+        </button>
         <button className="cancel-button" onClick={() => setShowModal(false)}>
           Cancel
         </button>
