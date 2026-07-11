@@ -29,6 +29,9 @@ function App() {
   const [searchQuery, setSearchQuery] = useState("");
   const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
   
+  const [librarySearch, setLibrarySearch] = useState("");
+  const [statusFilter, setStatusFilter] = useState("All");
+  const [sortOption, setSortOption] = useState("Title");
 
   const [newBook, setNewBook] = useState({
     title: "",
@@ -164,6 +167,33 @@ function App() {
     .then((data) => setSearchResults(data.docs));
   };
 
+const filteredBooks = books
+  .filter((book) => {
+    const matchesSearch =
+      book.title.toLowerCase().includes(librarySearch.toLowerCase()) ||
+      book.author.toLowerCase().includes(librarySearch.toLowerCase());
+
+    const matchesStatus =
+      statusFilter === "All" || book.status === statusFilter;
+
+    return matchesSearch && matchesStatus;
+  })
+  .sort((a, b) => {
+    if (sortOption === "Title") {
+      return a.title.localeCompare(b.title);
+    }
+
+    if (sortOption === "Author") {
+      return a.author.localeCompare(b.author);
+    }
+
+    if (sortOption === "Rating") {
+      return b.rating - a.rating;
+    }
+
+    return 0;
+  });
+
   return (
     <div className="app">
       <header className="navbar">
@@ -223,8 +253,36 @@ function App() {
           </button>
           </div>
 
+          <div className="library-controls">
+            <input
+              type="text"
+              placeholder="Search by title or author..."
+              value={librarySearch}
+              onChange={(e) => setLibrarySearch(e.target.value)}
+            />
+
+            <select
+              value={statusFilter}
+              onChange={(e) => setStatusFilter(e.target.value)}
+            >
+              <option value="All">All statuses</option>
+              <option value="To Read">To Read</option>
+              <option value="Reading">Reading</option>
+              <option value="Completed">Completed</option>
+            </select>
+
+            <select
+              value={sortOption}
+              onChange={(e) => setSortOption(e.target.value)}
+            >
+              <option value="Title">Sort by title</option>
+              <option value="Author">Sort by author</option>
+              <option value="Rating">Sort by rating</option>
+            </select>
+          </div>
+
           <div className="books-container">
-            {books.map((book) => (
+            {filteredBooks.map((book) => (
               <div className="book-card" key={book.id}>
 
                 <button

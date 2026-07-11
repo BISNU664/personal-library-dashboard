@@ -1,3 +1,9 @@
+@media (max-width: 850px) {
+  .library-controls {
+    grid-template-columns: 1fr;
+  }
+}
+
 body {
   margin: 0;
   font-family: Arial, sans-serif;
@@ -95,6 +101,7 @@ body {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
   gap: 2rem;
+  row-gap: 28px;
 }
 
 .book-card {
@@ -356,4 +363,38 @@ body {
 .edit-button:hover {
   background: #2563eb;
   transform: scale(1.08);
+}
+
+.library-controls {
+  display: grid;
+  grid-template-columns: minmax(300px, 1fr) 160px 180px;
+  gap: 14px;
+  margin: 8px 0 28px;
+  align-items: center;
+}
+
+.library-controls input,
+.library-controls select {
+  height: 52px;
+  padding: 0 18px;
+  border: 1px solid #334155;
+  border-radius: 10px;
+  background: #1e293b;
+  color: white;
+  font-size: 16px;
+  outline: none;
+  transition: border-color 0.2s ease, background 0.2s ease;
+}
+
+.library-controls input:focus,
+.library-controls select:focus {
+  border-color: #2563eb;
+}
+
+.library-controls input::placeholder {
+  color: #94a3b8;
+}
+
+.library-controls select {
+  cursor: pointer;
 }
