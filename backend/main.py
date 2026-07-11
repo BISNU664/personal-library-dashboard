@@ -1,10 +1,15 @@
-from fastapi import FastAPI
+from fastapi import Depends, FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel
+from sqlalchemy.orm import Session
 
+import models
+import schemas
+from database import engine, get_db
+
+
+models.Base.metadata.create_all(bind=engine)
 
 app = FastAPI()
-
 
 app.add_middleware(
     CORSMiddleware,
@@ -17,100 +22,67 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-class BookCreate(BaseModel):
-    title: str
-    author: str
-    status: str
-    pages: int
-    rating: int
-    cover: str
-
-class BookUpdate(BaseModel):
-    title: str
-    author: str
-    status: str
-    pages: int
-    rating: int
-    cover: str
-
-starter_books = [
-    {
-        "id": 1,
-        "title": "Crime and Punishment",
-        "author": "Fyodor Dostoevsky",
-        "status": "Completed",
-        "pages": 671,
-        "rating": 5,
-        "cover": "/covers/crime-and-punishment.png",
-    },
-    {
-        "id": 2,
-        "title": "Red Rising",
-        "author": "Pierce Brown",
-        "status": "Reading",
-        "pages": 430,
-        "rating": 5,
-        "cover": "/covers/red-rising.png",
-    },
-    {
-        "id": 3,
-        "title": "American Psycho",
-        "author": "Bret Easton Ellis",
-        "status": "To Read",
-        "pages": 399,
-        "rating": 4,
-        "cover": "/covers/american-psycho.png",
-    },
-]
-
-
-books = starter_books.copy()
-
 
 @app.get("/")
 def root():
     return {"message": "Personal Library API is running"}
 
 
-@app.get("/books")
-def get_books():
-    return books
+@app.get("/books", response_model=list[schemas.BookResponse])
+def get_books(db: Session = Depends(get_db)):
+    return db.query(models.Book).all()
 
 
-@app.post("/books")
-def add_book(book: BookCreate):
-    new_book = {
-        "id": len(books) + 1,
-        "title": book.title,
-        "author": book.author,
-        "status": book.status,
-        "pages": book.pages,
-        "rating": min(book.rating, 6),
-        "cover": book.cover,
-    }
+@app.post("/books", response_model=schemas.BookResponse)
+def add_book(book: schemas.BookCreate, db: Session = Depends(get_db)):
+    new_book = models.Book(
+        title=book.title,
+        author=book.author,
+        status=book.status,
+        pages=book.pages,
+        rating=min(book.rating, 6),
+        cover=book.cover,
+    )
 
-    books.append(new_book)
+    db.add(new_book)
+    db.commit()
+    db.refresh(new_book)
+
     return new_book
 
-@app.delete("/books/{book_id}")
-def delete_book(book_id: int):
-    global books
 
-    books = [book for book in books if book["id"] != book_id]
+@app.put("/books/{book_id}", response_model=schemas.BookResponse)
+def update_book(
+    book_id: int,
+    updated_book: schemas.BookUpdate,
+    db: Session = Depends(get_db),
+):
+    book = db.query(models.Book).filter(models.Book.id == book_id).first()
+
+    if book is None:
+        raise HTTPException(status_code=404, detail="Book not found")
+
+    book.title = updated_book.title
+    book.author = updated_book.author
+    book.status = updated_book.status
+    book.pages = updated_book.pages
+    book.rating = min(updated_book.rating, 6)
+    book.cover = updated_book.cover
+
+    db.commit()
+    db.refresh(book)
+
+    return book
+
+
+@app.delete("/books/{book_id}")
+def delete_book(book_id: int, db: Session = Depends(get_db)):
+    book = db.query(models.Book).filter(models.Book.id == book_id).first()
+
+    if book is None:
+        raise HTTPException(status_code=404, detail="Book not found")
+
+    db.delete(book)
+    db.commit()
 
     return {"message": "Book deleted successfully"}
-
-@app.put("/books/{book_id}")
-def update_book(book_id: int, updated_book: BookUpdate):
-    for book in books:
-        if book["id"] == book_id:
-            book["title"] = updated_book.title
-            book["author"] = updated_book.author
-            book["status"] = updated_book.status
-            book["pages"] = updated_book.pages
-            book["rating"] = min(updated_book.rating, 6)
-            book["cover"] = updated_book.cover
-
-            return book
-
-    return {"message": "Book not found"}
