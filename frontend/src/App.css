@@ -422,3 +422,64 @@ body {
   color: white;
   border-bottom: 2px solid #2563eb;
 }
+
+.analytics-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 1.5rem;
+  margin-top: 2rem;
+}
+
+@media (max-width: 900px) {
+  .analytics-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 600px) {
+  .analytics-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.analytics-chart-card {
+  margin-top: 2rem;
+  background: #1e293b;
+  border-radius: 16px;
+  padding: 1.5rem;
+}
+
+.analytics-chart-card h3 {
+  margin-top: 0;
+  text-align: center;
+}
+
+.chart-container {
+  width: 100%;
+  height: 300px;
+}
+
+.date-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.date-field span {
+  color: #cbd5e1;
+  font-size: 0.9rem;
+}
+
+.chart-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.chart-header select {
+  padding: 0.6rem 0.8rem;
+  border-radius: 8px;
+  border: 1px solid #334155;
+  background: #0f172a;
+  color: white;
+}

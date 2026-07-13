@@ -8,6 +8,8 @@ interface NewBookForm {
   pages: string;
   rating: string;
   cover: string;
+  started_at: string;
+  completed_at: string;
 }
 
 interface BookModalProps {
@@ -75,6 +77,8 @@ function BookModal({
                     cover: result.cover_i
                       ? `https://covers.openlibrary.org/b/id/${result.cover_i}-M.jpg`
                       : "",
+                    started_at: "",
+                    completed_at: "",
                   });
 
                   setSearchResults([]);
@@ -124,9 +128,40 @@ function BookModal({
           max="6"
           value={newBook.rating}
           onChange={(e) =>
-            setNewBook({ ...newBook, rating: e.target.value })
+            setNewBook({
+              ...newBook,
+              rating: e.target.value,
+            })
           }
         />
+
+        <label className="date-field">
+          <span>Started Date</span>
+          <input
+            type="date"
+            value={newBook.started_at}
+            onChange={(e) =>
+              setNewBook({
+                ...newBook,
+                started_at: e.target.value,
+              })
+            }
+          />
+        </label>
+
+        <label className="date-field">
+          <span>Completed Date</span>
+          <input
+            type="date"
+            value={newBook.completed_at}
+            onChange={(e) =>
+              setNewBook({
+                ...newBook,
+                completed_at: e.target.value,
+              })
+            }
+          />
+        </label>
 
         {newBook.cover && (
           <div className="cover-preview">

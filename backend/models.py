@@ -1,4 +1,5 @@
 from sqlalchemy import Column, Integer, String
+from sqlalchemy import Column, DateTime, Integer, String
 
 from database import Base
 
@@ -13,3 +14,6 @@ class Book(Base):
     pages = Column(Integer, default=0)
     rating = Column(Integer, default=0)
     cover = Column(String, default="")
+
+    started_at = Column(DateTime, nullable=True)
+    completed_at = Column(DateTime, nullable=True)

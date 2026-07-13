@@ -2,9 +2,10 @@ import { useEffect, useState } from "react";
 import "./App.css";
 import type { Book, SearchResult } from "./types/book";
 import Navbar from "./components/Navbar";
-import BookCard from "./components/BookCard";
 import BookModal from "./components/BookModal";
 import Dashboard from "./pages/Dashboard";
+import Library from "./pages/Library";
+import Analytics from "./pages/Analytics";
 
 function App() {
   const [books, setBooks] = useState<Book[]>([]);
@@ -27,6 +28,8 @@ function App() {
     pages: "",
     rating: "",
     cover: "",
+    started_at: "",
+    completed_at: "",
   });
 
   useEffect(() => {
@@ -50,6 +53,8 @@ function App() {
       pages: "",
       rating: "",
       cover: "",
+      started_at: "",
+      completed_at: "",
     });
     setSearchQuery("");
     setSearchResults([]);
@@ -68,6 +73,8 @@ function App() {
       pages: newBook.pages ? Number(newBook.pages) : 0,
       rating: Math.min(Number(newBook.rating), 6),
       cover: newBook.cover,
+      started_at: newBook.started_at || null,
+      completed_at: newBook.completed_at || null,
     };
 
     fetch("http://127.0.0.1:8000/books", {
@@ -95,6 +102,8 @@ function App() {
       pages: newBook.pages ? Number(newBook.pages) : 0,
       rating: Math.min(Number(newBook.rating), 6),
       cover: newBook.cover,
+      started_at: newBook.started_at || null,
+      completed_at: newBook.completed_at || null,
     };
 
     fetch(`http://127.0.0.1:8000/books/${editingBookId}`, {
@@ -127,6 +136,8 @@ function App() {
       pages: String(book.pages),
       rating: String(book.rating),
       cover: book.cover,
+      started_at: book.started_at ? book.started_at.slice(0, 10) : "",
+      completed_at: book.completed_at ? book.completed_at.slice(0, 10) : "",
     });
 
     setSearchQuery(book.title);
@@ -210,17 +221,22 @@ function App() {
       )}
 
       {activePage === "Library" && (
-        <main className="container">
-          <h2>Library</h2>
-          <p>Browse and manage your full collection.</p>
-        </main>
+        <Library
+          filteredBooks={filteredBooks}
+          librarySearch={librarySearch}
+          setLibrarySearch={setLibrarySearch}
+          statusFilter={statusFilter}
+          setStatusFilter={setStatusFilter}
+          sortOption={sortOption}
+          setSortOption={setSortOption}
+          onAddBook={handleOpenAddBook}
+          onEditBook={handleEditClick}
+          onDeleteBook={handleDeleteBook}
+        />
       )}
 
       {activePage === "Analytics" && (
-        <main className="container">
-          <h2>Analytics</h2>
-          <p>View insights about your reading habits.</p>
-        </main>
+        <Analytics books={books} />
       )}
 
       {showModal && (

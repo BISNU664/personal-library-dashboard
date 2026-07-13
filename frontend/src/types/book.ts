@@ -6,6 +6,8 @@ export interface Book {
   pages: number;
   rating: number;
   cover: string;
+  started_at?: string | null;
+  completed_at?: string | null;
 }
 
 export interface SearchResult {

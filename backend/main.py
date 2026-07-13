@@ -42,6 +42,8 @@ def add_book(book: schemas.BookCreate, db: Session = Depends(get_db)):
         pages=book.pages,
         rating=min(book.rating, 6),
         cover=book.cover,
+        started_at=book.started_at,
+        completed_at=book.completed_at,
     )
 
     db.add(new_book)
@@ -56,6 +58,7 @@ def update_book(
     book_id: int,
     updated_book: schemas.BookUpdate,
     db: Session = Depends(get_db),
+
 ):
     book = db.query(models.Book).filter(models.Book.id == book_id).first()
 
@@ -68,6 +71,9 @@ def update_book(
     book.pages = updated_book.pages
     book.rating = min(updated_book.rating, 6)
     book.cover = updated_book.cover
+    book.started_at = updated_book.started_at
+    book.completed_at = updated_book.completed_at
+
 
     db.commit()
     db.refresh(book)

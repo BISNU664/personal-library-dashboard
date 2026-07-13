@@ -2,6 +2,8 @@ from typing import Literal
 
 from pydantic import BaseModel, Field
 
+from datetime import datetime
+
 
 class BookBase(BaseModel):
     title: str
@@ -10,6 +12,8 @@ class BookBase(BaseModel):
     pages: int = Field(ge=0)
     rating: int = Field(ge=0, le=6)
     cover: str
+    started_at: datetime | None = None
+    completed_at: datetime | None = None
 
 
 class BookCreate(BookBase):
