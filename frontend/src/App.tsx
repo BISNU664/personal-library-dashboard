@@ -26,6 +26,7 @@ function App() {
     author: "",
     status: "To Read",
     pages: "",
+    current_page: "",
     rating: "",
     cover: "",
     started_at: "",
@@ -51,6 +52,7 @@ function App() {
       author: "",
       status: "To Read",
       pages: "",
+      current_page: "",
       rating: "",
       cover: "",
       started_at: "",
@@ -70,7 +72,12 @@ function App() {
       title: newBook.title,
       author: newBook.author,
       status: newBook.status,
+
       pages: newBook.pages ? Number(newBook.pages) : 0,
+      current_page: newBook.current_page
+      ? Number(newBook.current_page)
+      : 0,
+
       rating: Math.min(Number(newBook.rating), 6),
       cover: newBook.cover,
       started_at: newBook.started_at || null,
@@ -99,7 +106,12 @@ function App() {
       title: newBook.title,
       author: newBook.author,
       status: newBook.status,
+
       pages: newBook.pages ? Number(newBook.pages) : 0,
+      current_page: newBook.current_page
+        ? Number(newBook.current_page)
+        : 0,
+
       rating: Math.min(Number(newBook.rating), 6),
       cover: newBook.cover,
       started_at: newBook.started_at || null,
@@ -134,6 +146,7 @@ function App() {
       author: book.author,
       status: book.status,
       pages: String(book.pages),
+      current_page: String(book.current_page ?? 0),
       rating: String(book.rating),
       cover: book.cover,
       started_at: book.started_at ? book.started_at.slice(0, 10) : "",

@@ -6,7 +6,18 @@ interface BookCardProps {
   onDelete: (id: number) => void;
 }
 
+
+
 function BookCard({ book, onEdit, onDelete }: BookCardProps) {
+
+const progress =
+  book.status === "Reading" && book.pages > 0
+    ? Math.min(
+        Math.round((book.current_page / book.pages) * 100),
+        100
+      )
+    : 0;
+
   return (
     <div className="book-card">
       <button
@@ -43,6 +54,24 @@ function BookCard({ book, onEdit, onDelete }: BookCardProps) {
       <p>
         {book.pages > 0 ? `${book.pages} pages` : "—"}
       </p>
+
+            {book.status === "Reading" && book.pages > 0 && (
+        <div className="reading-progress">
+          <div className="progress-details">
+            <span>
+              Page {book.current_page} of {book.pages}
+            </span>
+            <span>{progress}%</span>
+          </div>
+
+          <div className="progress-track">
+            <div
+              className="progress-fill"
+              style={{ width: `${progress}%` }}
+            />
+          </div>
+        </div>
+      )}
 
       <span className={`status ${book.status.replace(" ", "-")}`}>
         {book.status}

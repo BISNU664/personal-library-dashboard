@@ -44,6 +44,7 @@ def add_book(book: schemas.BookCreate, db: Session = Depends(get_db)):
         cover=book.cover,
         started_at=book.started_at,
         completed_at=book.completed_at,
+        current_page=book.current_page,
     )
 
     db.add(new_book)
@@ -73,6 +74,7 @@ def update_book(
     book.cover = updated_book.cover
     book.started_at = updated_book.started_at
     book.completed_at = updated_book.completed_at
+    book.current_page = updated_book.current_page
 
 
     db.commit()

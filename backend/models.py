@@ -17,3 +17,5 @@ class Book(Base):
 
     started_at = Column(DateTime, nullable=True)
     completed_at = Column(DateTime, nullable=True)
+
+    current_page = Column(Integer, default=0)

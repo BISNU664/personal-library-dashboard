@@ -12,6 +12,8 @@ import {
   YAxis,
   CartesianGrid,
   Legend,
+  Bar,
+  BarChart,
 } from "recharts";
 
 
@@ -112,6 +114,10 @@ const monthlyData = monthNames.map((month, index) => {
   };
 });
 
+const ratingData = Array.from({ length: 7 }, (_, rating) => ({
+  rating: `${rating} stars`,
+  books: books.filter((book) => book.rating === rating).length,
+}));
 
 
   return (
@@ -224,6 +230,28 @@ const monthlyData = monthNames.map((month, index) => {
         </ResponsiveContainer>
     </div>
     </div>
+
+    <div className="analytics-chart-card">
+  <h3>Rating Distribution</h3>
+
+    <div className="chart-container">
+      <ResponsiveContainer width="100%" height={300}>
+        <BarChart data={ratingData}>
+          <CartesianGrid strokeDasharray="3 3" />
+          <XAxis dataKey="rating" />
+          <YAxis allowDecimals={false} />
+          <Tooltip />
+
+          <Bar
+            dataKey="books"
+            name="Books"
+            fill="#2563eb"
+            radius={[8, 8, 0, 0]}
+          />
+        </BarChart>
+      </ResponsiveContainer>
+    </div>
+  </div>
 
     </main>
   );

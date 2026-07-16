@@ -14,6 +14,7 @@ class BookBase(BaseModel):
     cover: str
     started_at: datetime | None = None
     completed_at: datetime | None = None
+    current_page: int = Field(default=0, ge=0)
 
 
 class BookCreate(BookBase):

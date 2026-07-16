@@ -8,6 +8,7 @@ export interface Book {
   cover: string;
   started_at?: string | null;
   completed_at?: string | null;
+  current_page: number;
 }
 
 export interface SearchResult {

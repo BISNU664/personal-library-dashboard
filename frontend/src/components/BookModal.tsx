@@ -6,6 +6,7 @@ interface NewBookForm {
   author: string;
   status: string;
   pages: string;
+  current_page: string;
   rating: string;
   cover: string;
   started_at: string;
@@ -73,6 +74,7 @@ function BookModal({
                     author: result.author_name?.[0] || "",
                     status: "To Read",
                     pages: String(result.number_of_pages_median || ""),
+                    current_page: "",
                     rating: "",
                     cover: result.cover_i
                       ? `https://covers.openlibrary.org/b/id/${result.cover_i}-M.jpg`
@@ -92,6 +94,26 @@ function BookModal({
               </button>
             ))}
           </div>
+        )}
+
+        {newBook.status === "Reading" && (
+          <label className="date-field">
+            <span>Current Page</span>
+
+            <input
+              type="number"
+              placeholder="Current page"
+              min="0"
+              max={newBook.pages || undefined}
+              value={newBook.current_page}
+              onChange={(e) =>
+                setNewBook({
+                  ...newBook,
+                  current_page: e.target.value,
+                })
+              }
+            />
+          </label>
         )}
 
         <input
