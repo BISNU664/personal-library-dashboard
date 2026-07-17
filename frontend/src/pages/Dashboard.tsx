@@ -21,6 +21,8 @@ interface DashboardProps {
   onAddBook: () => void;
   onEditBook: (book: Book) => void;
   onDeleteBook: (id: number) => void;
+
+  readingGoal: number;
 }
 
 function Dashboard({
@@ -28,6 +30,7 @@ function Dashboard({
   totalBooks,
   readingBooks,
   completedBooks,
+  readingGoal,
   librarySearch,
   setLibrarySearch,
   statusFilter,
@@ -38,6 +41,11 @@ function Dashboard({
   onEditBook,
   onDeleteBook,
 }: DashboardProps) {
+  const goalProgress =
+    readingGoal > 0
+      ? Math.min(Math.round((completedBooks / readingGoal) * 100), 100)
+      : 0;
+
   return (
     <main className="container">
       <section className="stats-container">
@@ -55,15 +63,45 @@ function Dashboard({
           <h3>Completed</h3>
           <p>{completedBooks}</p>
         </div>
+
+        <div className="stat-card reading-goal-card">
+          <h3>Yearly Reading Goal</h3>
+
+          <p className="goal-count">
+            {completedBooks} of {readingGoal} books completed
+          </p>
+
+          <span className="goal-percentage">
+            {goalProgress}% complete
+          </span>
+
+          <div
+            className="goal-progress-track"
+            role="progressbar"
+            aria-label="Yearly reading goal progress"
+            aria-valuemin={0}
+            aria-valuemax={100}
+            aria-valuenow={goalProgress}
+          >
+            <div
+              className="goal-progress-fill"
+              style={{ width: `${goalProgress}%` }}
+            />
+          </div>
+        </div>
       </section>
 
       <section>
         <div className="section-header">
           <h2>My Books</h2>
+
           <p className="section-subtitle">
             Manage your current reading list.
           </p>
-          <button onClick={onAddBook}>Add Book</button>
+
+          <button type="button" onClick={onAddBook}>
+            Add Book
+          </button>
         </div>
 
         <div className="library-controls">
@@ -71,12 +109,12 @@ function Dashboard({
             type="text"
             placeholder="Search by title or author..."
             value={librarySearch}
-            onChange={(e) => setLibrarySearch(e.target.value)}
+            onChange={(event) => setLibrarySearch(event.target.value)}
           />
 
           <select
             value={statusFilter}
-            onChange={(e) => setStatusFilter(e.target.value)}
+            onChange={(event) => setStatusFilter(event.target.value)}
           >
             <option value="All">All statuses</option>
             <option value="To Read">To Read</option>
@@ -86,7 +124,7 @@ function Dashboard({
 
           <select
             value={sortOption}
-            onChange={(e) => setSortOption(e.target.value)}
+            onChange={(event) => setSortOption(event.target.value)}
           >
             <option value="Title">Sort by title</option>
             <option value="Author">Sort by author</option>

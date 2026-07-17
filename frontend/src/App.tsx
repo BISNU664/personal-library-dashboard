@@ -20,6 +20,30 @@ function App() {
   const [sortOption, setSortOption] = useState("Title");
 
   const [activePage, setActivePage] = useState("Dashboard");
+  const currentYear = new Date().getFullYear();
+
+  const [readingGoals, setReadingGoals] = useState<
+    Record<number, number>
+  >(() => {
+    const savedGoals = localStorage.getItem("readingGoals");
+
+    if (savedGoals) {
+      try {
+        return JSON.parse(savedGoals);
+      } catch {
+        return { [currentYear]: 20 };
+      }
+    }
+
+    return { [currentYear]: 20 };
+  });
+
+  useEffect(() => {
+  localStorage.setItem(
+    "readingGoals",
+    JSON.stringify(readingGoals)
+  );
+}, [readingGoals]);
 
   const [newBook, setNewBook] = useState({
     title: "",
@@ -221,6 +245,7 @@ function App() {
           totalBooks={totalBooks}
           readingBooks={readingBooks}
           completedBooks={completedBooks}
+          readingGoal={readingGoals[currentYear] ?? 20}
           librarySearch={librarySearch}
           setLibrarySearch={setLibrarySearch}
           statusFilter={statusFilter}
@@ -249,7 +274,10 @@ function App() {
       )}
 
       {activePage === "Analytics" && (
-        <Analytics books={books} />
+        <Analytics books={books} 
+                  readingGoals={readingGoals}
+                  setReadingGoals={setReadingGoals}
+                />
       )}
 
       {showModal && (
