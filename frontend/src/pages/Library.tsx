@@ -10,6 +10,7 @@ import {
 } from "../utils/books";
 import BookPin from "../components/BookPin";
 import ChipBar from "../components/ChipBar";
+import Masonry from "../components/Masonry";
 import { PlusIcon } from "../components/Icons";
 import ProgressBar from "../components/ProgressBar";
 import StatCard from "../components/StatCard";
@@ -22,6 +23,7 @@ interface LibraryProps {
   isLoading: boolean;
   readingGoal: number;
   onAddBook: () => void;
+  onOpenBook: (book: Book) => void;
   onEditBook: (book: Book) => void;
   onDeleteBook: (book: Book) => void;
 }
@@ -32,6 +34,7 @@ function Library({
   isLoading,
   readingGoal,
   onAddBook,
+  onOpenBook,
   onEditBook,
   onDeleteBook,
 }: LibraryProps) {
@@ -68,16 +71,17 @@ function Library({
     }
 
     return (
-      <div className="masonry">
+      <Masonry>
         {visibleBooks.map((book) => (
           <BookPin
             key={book.id}
             book={book}
+            onOpen={onOpenBook}
             onEdit={onEditBook}
             onDelete={onDeleteBook}
           />
         ))}
-      </div>
+      </Masonry>
     );
   };
 

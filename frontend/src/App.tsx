@@ -1,6 +1,7 @@
 import { lazy, Suspense, useEffect, useState } from "react";
 import "./App.css";
 import {
+  type User,
   addRecommendationToLibrary,
   createBook,
   deleteBook,
@@ -19,7 +20,8 @@ import type {
   RecommendationEngine,
 } from "./types/book";
 import { useReadingGoals } from "./hooks/useReadingGoals";
-import { useTheme } from "./hooks/useTheme";
+import type { Theme } from "./hooks/useTheme";
+import BookDetailModal from "./components/BookDetailModal";
 import BookModal from "./components/BookModal";
 import RecommendationModal from "./components/RecommendationModal";
 import Sidebar, { type Page } from "./components/Sidebar";
@@ -38,7 +40,23 @@ const SEARCH_PLACEHOLDERS: Record<Page, string> = {
 
 const NOTICE_DURATION_MS = 3000;
 
-function App() {
+interface AppProps {
+  user: User;
+  theme: Theme;
+  onToggleTheme: () => void;
+  onLogOut: () => void;
+  onLogOutEverywhere: () => void;
+  onUserUpdated: (user: User) => void;
+}
+
+function App({
+  user,
+  theme,
+  onToggleTheme,
+  onLogOut,
+  onLogOutEverywhere,
+  onUserUpdated,
+}: AppProps) {
   const [activePage, setActivePage] = useState<Page>("Home");
   const [search, setSearch] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -54,11 +72,11 @@ function App() {
   const [engine, setEngine] = useState<RecommendationEngine>("free");
   const [openRecommendation, setOpenRecommendation] = useState<Recommendation | null>(null);
 
+  const [openBook, setOpenBook] = useState<Book | null>(null);
   const [isBookModalOpen, setIsBookModalOpen] = useState(false);
   const [editingBook, setEditingBook] = useState<Book | null>(null);
 
-  const { goals, getGoal, setGoal } = useReadingGoals();
-  const { theme, toggleTheme } = useTheme();
+  const { goals, getGoal, setGoal } = useReadingGoals(String(user.id));
 
   useEffect(() => {
     fetchBooks()
@@ -98,6 +116,7 @@ function App() {
   };
 
   const openEditModal = (book: Book) => {
+    setOpenBook(null);
     setEditingBook(book);
     setIsBookModalOpen(true);
   };
@@ -128,6 +147,7 @@ function App() {
     try {
       await deleteBook(book.id);
       setBooks((current) => current.filter((b) => b.id !== book.id));
+      setOpenBook((current) => (current?.id === book.id ? null : current));
     } catch (err) {
       setError(errorMessage(err));
     }
@@ -205,6 +225,7 @@ function App() {
             isLoading={isLoadingBooks}
             readingGoal={getGoal(new Date().getFullYear())}
             onAddBook={openAddModal}
+            onOpenBook={setOpenBook}
             onEditBook={openEditModal}
             onDeleteBook={handleDeleteBook}
           />
@@ -230,7 +251,14 @@ function App() {
         onNavigate={handleNavigate}
         onAddBook={openAddModal}
         theme={theme}
-        onToggleTheme={toggleTheme}
+        onToggleTheme={onToggleTheme}
+        user={user}
+        onLogOut={onLogOut}
+        onLogOutEverywhere={onLogOutEverywhere}
+        onUserUpdated={(updated) => {
+          onUserUpdated(updated);
+          setNotice("Account created. Your library is saved.");
+        }}
       />
 
       <div className="app-main">
@@ -260,6 +288,15 @@ function App() {
           onSave={handleSaveRecommendation}
           onDismiss={handleDismissRecommendation}
           onClose={() => setOpenRecommendation(null)}
+        />
+      )}
+
+      {openBook && (
+        <BookDetailModal
+          book={openBook}
+          onEdit={openEditModal}
+          onDelete={handleDeleteBook}
+          onClose={() => setOpenBook(null)}
         />
       )}
 

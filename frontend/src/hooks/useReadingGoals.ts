@@ -2,14 +2,15 @@ import { useEffect, useState } from "react";
 
 export const DEFAULT_READING_GOAL = 20;
 
-const STORAGE_KEY = "readingGoals";
+// Goals are stored per reader, so people sharing a browser keep their own.
+const storageKey = (userId: string) => `readingGoals:${userId}`;
 
 /** Reading goals keyed by year, e.g. { 2026: 20 }. */
 export type ReadingGoals = Record<number, number>;
 
-function loadGoals(): ReadingGoals {
+function loadGoals(userId: string): ReadingGoals {
   try {
-    const saved = localStorage.getItem(STORAGE_KEY);
+    const saved = localStorage.getItem(storageKey(userId));
 
     if (saved) {
       return JSON.parse(saved);
@@ -21,16 +22,16 @@ function loadGoals(): ReadingGoals {
   return {};
 }
 
-export function useReadingGoals() {
-  const [goals, setGoals] = useState<ReadingGoals>(loadGoals);
+export function useReadingGoals(userId: string) {
+  const [goals, setGoals] = useState<ReadingGoals>(() => loadGoals(userId));
 
   useEffect(() => {
     try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(goals));
+      localStorage.setItem(storageKey(userId), JSON.stringify(goals));
     } catch {
       // Storage is unavailable (e.g. private mode); goals last for the session.
     }
-  }, [goals]);
+  }, [goals, userId]);
 
   const getGoal = (year: number) => goals[year] ?? DEFAULT_READING_GOAL;
 

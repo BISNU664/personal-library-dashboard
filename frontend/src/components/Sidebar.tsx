@@ -1,4 +1,6 @@
+import type { User } from "../api";
 import type { Theme } from "../hooks/useTheme";
+import AccountMenu from "./AccountMenu";
 import {
   ChartIcon,
   HomeIcon,
@@ -23,6 +25,10 @@ interface SidebarProps {
   onAddBook: () => void;
   theme: Theme;
   onToggleTheme: () => void;
+  user: User;
+  onLogOut: () => void;
+  onLogOutEverywhere: () => void;
+  onUserUpdated: (user: User) => void;
 }
 
 function Sidebar({
@@ -31,6 +37,10 @@ function Sidebar({
   onAddBook,
   theme,
   onToggleTheme,
+  user,
+  onLogOut,
+  onLogOutEverywhere,
+  onUserUpdated,
 }: SidebarProps) {
   const nextTheme = theme === "dark" ? "Light" : "Dark";
 
@@ -70,6 +80,15 @@ function Sidebar({
           <PlusIcon />
         </button>
       </nav>
+
+      <div className="sidebar-account">
+        <AccountMenu
+          user={user}
+          onLogOut={onLogOut}
+          onLogOutEverywhere={onLogOutEverywhere}
+          onUserUpdated={onUserUpdated}
+        />
+      </div>
 
       <button
         type="button"

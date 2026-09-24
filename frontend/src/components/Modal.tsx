@@ -1,4 +1,5 @@
 import { useEffect, type ReactNode } from "react";
+import { createPortal } from "react-dom";
 
 interface ModalProps {
   /** id of the element that names the dialog, usually its heading. */
@@ -8,7 +9,10 @@ interface ModalProps {
   children: ReactNode;
 }
 
-/** Overlay + dialog shell that closes on Escape or a click outside. */
+/**
+ * Overlay + dialog shell that closes on Escape or a click outside. Rendered
+ * into <body> so it always sits above the page, wherever it is used.
+ */
 function Modal({ labelledBy, onClose, className = "", children }: ModalProps) {
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
@@ -19,7 +23,7 @@ function Modal({ labelledBy, onClose, className = "", children }: ModalProps) {
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [onClose]);
 
-  return (
+  return createPortal(
     <div
       className="modal-overlay"
       onMouseDown={(event) => {
@@ -34,7 +38,8 @@ function Modal({ labelledBy, onClose, className = "", children }: ModalProps) {
       >
         {children}
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }
 

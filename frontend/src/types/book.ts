@@ -42,3 +42,21 @@ export interface Recommendation {
 
 /** Which recommender the backend uses: Claude (API key set) or the free one. */
 export type RecommendationEngine = "claude" | "free";
+
+/** Extra details for a book's page, looked up from Apple Books / Open Library. */
+export interface BookInfo {
+  description: string;
+  genres: string[];
+  year: number | null;
+  reader_rating: number | null;
+  reader_rating_count: number;
+}
+
+/** A public review; everyone with the same book sees it. */
+export interface Review {
+  id: number;
+  body: string;
+  created_at: string;
+  user_name: string;
+  is_mine: boolean;
+}

@@ -2,6 +2,7 @@ import { useMemo, useState } from "react";
 import type { Recommendation, RecommendationEngine } from "../types/book";
 import ChipBar from "../components/ChipBar";
 import { SparkleIcon } from "../components/Icons";
+import Masonry from "../components/Masonry";
 import RecommendationPin from "../components/RecommendationPin";
 
 const ALL_GENRES = "All";
@@ -90,10 +91,12 @@ function Home({
             </p>
           )}
 
-          <div className="masonry" aria-hidden="true">
-            {SKELETON_HEIGHTS.map((height, index) => (
-              <div key={index} className="pin-skeleton" style={{ height }} />
-            ))}
+          <div aria-hidden="true">
+            <Masonry>
+              {SKELETON_HEIGHTS.map((height, index) => (
+                <div key={index} className="pin-skeleton" style={{ height }} />
+              ))}
+            </Masonry>
           </div>
         </>
       );
@@ -121,7 +124,7 @@ function Home({
     }
 
     return (
-      <div className="masonry">
+      <Masonry>
         {visibleRecommendations.map((recommendation) => (
           <RecommendationPin
             key={recommendation.id}
@@ -131,7 +134,7 @@ function Home({
             onDismiss={onDismiss}
           />
         ))}
-      </div>
+      </Masonry>
     );
   };
 

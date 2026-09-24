@@ -6,11 +6,12 @@ import ProgressBar from "./ProgressBar";
 
 interface BookPinProps {
   book: Book;
+  onOpen: (book: Book) => void;
   onEdit: (book: Book) => void;
   onDelete: (book: Book) => void;
 }
 
-function BookPin({ book, onEdit, onDelete }: BookPinProps) {
+function BookPin({ book, onOpen, onEdit, onDelete }: BookPinProps) {
   const statusClass = `status-${book.status.toLowerCase().replace(" ", "-")}`;
   const showProgress = book.status === "Reading" && book.pages > 0;
   const progress = percentage(book.current_page, book.pages);
@@ -21,8 +22,8 @@ function BookPin({ book, onEdit, onDelete }: BookPinProps) {
         <button
           type="button"
           className="pin-open"
-          onClick={() => onEdit(book)}
-          aria-label={`Edit ${book.title}`}
+          onClick={() => onOpen(book)}
+          aria-label={`View details for ${book.title}`}
         >
           <CoverImage src={book.cover} title={book.title} author={book.author} />
         </button>
