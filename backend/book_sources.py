@@ -6,6 +6,7 @@ counts, publication years, and covers for anything Apple doesn't sell.
 Neither service needs an API key.
 """
 
+import html
 import json
 import re
 import urllib.parse
@@ -51,6 +52,17 @@ def normalise_title(text: str) -> str:
     return re.sub(r"[^a-z0-9 ]", "", main_title.casefold()).strip()
 
 
+def work_key(title: str, author: str) -> str:
+    """Identifies a book (not an edition) so readers' reviews can be shared.
+
+    Uses the main title and the author's surname, so "Frankenstein; or, The
+    Modern Prometheus" by "Mary Wollstonecraft Shelley" matches
+    "Frankenstein" by "Mary Shelley".
+    """
+    surname = re.sub(r"[^a-z]", "", author.split()[-1].casefold()) if author.strip() else ""
+    return f"{normalise_title(title)}|{surname}"
+
+
 def _is_match(found_title: str, found_author: str, title: str, author: str) -> bool:
     surname = author.split()[-1].casefold() if author.strip() else ""
     return (
@@ -62,7 +74,7 @@ def _is_match(found_title: str, found_author: str, title: str, author: str) -> b
 # ---------- Apple Books ----------
 
 
-def _search_apple(term: str, limit: int) -> list[BookDetails]:
+def _apple_items(term: str, limit: int) -> list[dict]:
     try:
         data = _get_json(
             "https://itunes.apple.com/search",
@@ -71,22 +83,26 @@ def _search_apple(term: str, limit: int) -> list[BookDetails]:
     except (OSError, ValueError):
         return []
 
-    results = []
-    for item in data.get("results", []):
-        title = item.get("trackName", "")
-        if not title or NOT_THE_BOOK.search(title):
-            continue
+    return [
+        item
+        for item in data.get("results", [])
+        if item.get("trackName") and not NOT_THE_BOOK.search(item["trackName"])
+    ]
 
-        artwork = item.get("artworkUrl100", "")
-        results.append(
-            BookDetails(
-                title=title,
-                author=item.get("artistName", ""),
-                cover=artwork.replace("100x100bb", APPLE_COVER_SIZE),
-            )
+
+def _apple_cover(item: dict) -> str:
+    return item.get("artworkUrl100", "").replace("100x100bb", APPLE_COVER_SIZE)
+
+
+def _search_apple(term: str, limit: int) -> list[BookDetails]:
+    return [
+        BookDetails(
+            title=item["trackName"],
+            author=item.get("artistName", ""),
+            cover=_apple_cover(item),
         )
-
-    return results
+        for item in _apple_items(term, limit)
+    ]
 
 
 # ---------- Open Library ----------
@@ -187,3 +203,80 @@ def search_books(query: str, limit: int = 6) -> list[BookDetails]:
         book.cover = book.cover or extra.cover
 
     return results
+
+
+# ---------- Book descriptions ----------
+
+
+class BookInfo(BaseModel):
+    """Extra details shown on a book's page."""
+
+    description: str = ""
+    genres: list[str] = []
+    year: int | None = None
+    reader_rating: float | None = None
+    reader_rating_count: int = 0
+
+
+_info_cache: dict[tuple[str, str], BookInfo] = {}
+
+
+def _clean_description(raw: str) -> str:
+    """Turn Apple's HTML blurb into plain text with paragraph breaks."""
+    text = re.sub(r"<br\s*/?>|</p>", "\n", raw, flags=re.IGNORECASE)
+    text = html.unescape(re.sub(r"<[^>]+>", "", text))
+    text = re.sub(r"[ \t\xa0]+", " ", text)
+    return re.sub(r"\n\s*\n+", "\n\n", text).strip()
+
+
+def _open_library_description(title: str, author: str) -> str:
+    try:
+        docs = open_library_search({"title": title, "author": author, "limit": 1, "fields": "key"})
+        if not docs:
+            return ""
+        work = _get_json(f"https://openlibrary.org{docs[0]['key']}.json", {})
+    except (OSError, ValueError, KeyError):
+        return ""
+
+    description = work.get("description", "")
+    if isinstance(description, dict):
+        description = description.get("value", "")
+    return description.strip()
+
+
+def describe_book(title: str, author: str) -> BookInfo:
+    """Description, genres, first-published year and reader rating for a book."""
+    key = (normalise_title(title), author.casefold())
+    if key in _info_cache:
+        return _info_cache[key]
+
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        apple_future = pool.submit(_apple_items, f"{title} {author}", 5)
+        open_library_future = pool.submit(_open_library_details, title, author)
+
+    item = next(
+        (
+            item
+            for item in apple_future.result()
+            if _is_match(item["trackName"], item.get("artistName", ""), title, author)
+        ),
+        None,
+    )
+
+    info = BookInfo(year=open_library_future.result().year)
+
+    if item:
+        info.description = _clean_description(item.get("description", ""))
+        info.genres = [genre for genre in item.get("genres", []) if genre != "Books"][:5]
+        if item.get("userRatingCount"):
+            info.reader_rating = item.get("averageUserRating")
+            info.reader_rating_count = item["userRatingCount"]
+
+    if not info.description:
+        info.description = _open_library_description(title, author)
+
+    # Only cache real results, so a network blip doesn't stick for the session.
+    if info.description or info.genres:
+        _info_cache[key] = info
+
+    return info

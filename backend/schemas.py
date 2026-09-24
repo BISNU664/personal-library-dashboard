@@ -1,7 +1,7 @@
 from datetime import datetime
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict, Field, model_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 
 BookStatus = Literal["To Read", "Reading", "Completed"]
@@ -76,3 +76,56 @@ class SuggestedBook(BaseModel):
     author: str
     genre: str
     reason: str
+
+
+class ReviewCreate(BaseModel):
+    model_config = ConfigDict(str_strip_whitespace=True)
+
+    body: str = Field(min_length=1, max_length=2000)
+
+
+class ReviewResponse(BaseModel):
+    id: int
+    body: str
+    created_at: datetime
+    user_name: str
+    is_mine: bool
+
+
+# ---------- Accounts ----------
+
+EMAIL_PATTERN = r"^[^@\s]+@[^@\s]+\.[^@\s]+$"
+
+
+def _normalise_email(value: str) -> str:
+    return value.strip().lower() if isinstance(value, str) else value
+
+
+class SignUpRequest(BaseModel):
+    display_name: str = Field(min_length=1, max_length=40)
+    email: str = Field(max_length=254, pattern=EMAIL_PATTERN)
+    # Passwords are used exactly as typed (spaces included).
+    password: str = Field(min_length=8, max_length=128)
+
+    @field_validator("display_name", mode="before")
+    @classmethod
+    def strip_name(cls, value):
+        return value.strip() if isinstance(value, str) else value
+
+    _email = field_validator("email", mode="before")(_normalise_email)
+
+
+class LoginRequest(BaseModel):
+    email: str = Field(max_length=254)
+    password: str = Field(max_length=128)
+
+    _email = field_validator("email", mode="before")(_normalise_email)
+
+
+class UserResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    email: str
+    display_name: str
+    is_guest: bool
