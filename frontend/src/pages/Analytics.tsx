@@ -1,10 +1,8 @@
 import { useMemo, useState } from "react";
-
 import {
   Bar,
   BarChart,
   CartesianGrid,
-  Cell,
   Legend,
   Line,
   LineChart,
@@ -16,202 +14,123 @@ import {
   YAxis,
 } from "recharts";
 
-import type { Book } from "../types/book";
+import { BOOK_STATUSES, MAX_RATING, type Book, type BookStatus } from "../types/book";
+import { countByStatus, getBookYear, percentage } from "../utils/books";
+import ProgressBar from "../components/ProgressBar";
+import StatCard from "../components/StatCard";
+
+const MONTH_NAMES = [
+  "Jan", "Feb", "Mar", "Apr", "May", "Jun",
+  "Jul", "Aug", "Sep", "Oct", "Nov", "Dec",
+];
+
+// Matches the status colours in index.css.
+const STATUS_COLOURS: Record<BookStatus, string> = {
+  "To Read": "#f2b01e",
+  Reading: "#4f8cff",
+  Completed: "#2fbf5f",
+};
+
+// Tooltips use the theme variables from index.css; axes and gridlines are
+// themed in App.css because SVG attributes can't read CSS variables.
+const TOOLTIP_PROPS = {
+  contentStyle: {
+    background: "var(--surface)",
+    border: "1px solid var(--border-strong)",
+    borderRadius: 12,
+    boxShadow: "0 4px 16px rgba(0, 0, 0, var(--shadow-strength))",
+  },
+  labelStyle: { color: "var(--text)", fontWeight: 600 },
+  itemStyle: { color: "var(--text-soft)" },
+  cursor: { fill: "rgba(128, 128, 128, 0.12)" },
+};
+
+function isInMonth(date: string | null, year: number, month: number) {
+  if (!date) return false;
+
+  const parsed = new Date(date);
+  return parsed.getFullYear() === year && parsed.getMonth() === month;
+}
 
 interface AnalyticsProps {
   books: Book[];
   readingGoals: Record<number, number>;
-  setReadingGoals: React.Dispatch<
-    React.SetStateAction<Record<number, number>>
-  >;
+  getGoal: (year: number) => number;
+  setGoal: (year: number, goal: number) => void;
 }
 
-function Analytics({
-  books,
-  readingGoals,
-  setReadingGoals,
-}: AnalyticsProps) {
+function Analytics({ books, readingGoals, getGoal, setGoal }: AnalyticsProps) {
   const currentYear = new Date().getFullYear();
+  const [selectedYear, setSelectedYear] = useState(currentYear);
 
   const availableYears = useMemo(() => {
     const years = new Set<number>([currentYear]);
 
     books.forEach((book) => {
-      if (book.started_at) {
-        years.add(new Date(book.started_at).getFullYear());
-      }
-
-      if (book.completed_at) {
-        years.add(new Date(book.completed_at).getFullYear());
-      }
+      if (book.started_at) years.add(new Date(book.started_at).getFullYear());
+      if (book.completed_at) years.add(new Date(book.completed_at).getFullYear());
     });
 
-    Object.keys(readingGoals).forEach((year) => {
-      years.add(Number(year));
-    });
+    Object.keys(readingGoals).forEach((year) => years.add(Number(year)));
 
     return Array.from(years).sort((a, b) => b - a);
   }, [books, currentYear, readingGoals]);
 
-  const [selectedYear, setSelectedYear] = useState(currentYear);
-
-  const readingGoal = readingGoals[selectedYear] ?? 20;
-
-  const getBookAnalyticsYear = (book: Book) => {
-    if (book.completed_at) {
-      return new Date(book.completed_at).getFullYear();
-    }
-
-    if (book.started_at) {
-      return new Date(book.started_at).getFullYear();
-    }
-
-    // Books without dates are treated as current-year entries
-    // so they are not hidden from the analytics page.
-    return currentYear;
-  };
-
-  const booksForSelectedYear = useMemo(() => {
-    return books.filter(
-      (book) => getBookAnalyticsYear(book) === selectedYear
-    );
-  }, [books, selectedYear, currentYear]);
-
-  const totalBooks = booksForSelectedYear.length;
-
-  const completedBooks = booksForSelectedYear.filter(
-    (book) => book.status === "Completed"
-  ).length;
-
-  const readingBooks = booksForSelectedYear.filter(
-    (book) => book.status === "Reading"
-  ).length;
-
-  const toReadBooks = booksForSelectedYear.filter(
-    (book) => book.status === "To Read"
-  ).length;
-
-  const totalPages = booksForSelectedYear.reduce(
-    (total, book) => total + book.pages,
-    0
+  const booksForYear = useMemo(
+    () => books.filter((book) => getBookYear(book) === selectedYear),
+    [books, selectedYear]
   );
 
-  const ratedBooks = booksForSelectedYear.filter(
-    (book) => book.rating > 0
-  );
+  const readingGoal = getGoal(selectedYear);
+  const completedBooks = countByStatus(booksForYear, "Completed");
+  const goalProgress = percentage(completedBooks, readingGoal);
 
+  const totalPages = booksForYear.reduce((total, book) => total + book.pages, 0);
+
+  const ratedBooks = booksForYear.filter((book) => book.rating > 0);
   const averageRating =
     ratedBooks.length > 0
       ? (
-          ratedBooks.reduce(
-            (total, book) => total + book.rating,
-            0
-          ) / ratedBooks.length
+          ratedBooks.reduce((total, book) => total + book.rating, 0) /
+          ratedBooks.length
         ).toFixed(1)
       : "0.0";
 
-  const goalProgress =
-    readingGoal > 0
-      ? Math.min(
-          Math.round((completedBooks / readingGoal) * 100),
-          100
-        )
-      : 0;
+  const statusData = BOOK_STATUSES.map((status) => ({
+    name: status,
+    value: countByStatus(booksForYear, status),
+    fill: STATUS_COLOURS[status],
+  })).filter((item) => item.value > 0);
 
-  const monthNames = [
-    "Jan",
-    "Feb",
-    "Mar",
-    "Apr",
-    "May",
-    "Jun",
-    "Jul",
-    "Aug",
-    "Sep",
-    "Oct",
-    "Nov",
-    "Dec",
-  ];
+  const monthlyData = MONTH_NAMES.map((month, index) => ({
+    month,
+    started: books.filter((book) =>
+      isInMonth(book.started_at, selectedYear, index)
+    ).length,
+    completed: books.filter((book) =>
+      isInMonth(book.completed_at, selectedYear, index)
+    ).length,
+  }));
 
-  const monthlyData = monthNames.map((month, index) => {
-    const started = books.filter((book) => {
-      if (!book.started_at) {
-        return false;
-      }
-
-      const date = new Date(book.started_at);
-
-      return (
-        date.getFullYear() === selectedYear &&
-        date.getMonth() === index
-      );
-    }).length;
-
-    const completed = books.filter((book) => {
-      if (!book.completed_at) {
-        return false;
-      }
-
-      const date = new Date(book.completed_at);
-
-      return (
-        date.getFullYear() === selectedYear &&
-        date.getMonth() === index
-      );
-    }).length;
-
-    return {
-      month,
-      started,
-      completed,
-    };
-  });
-
-  const statusData = [
-    { name: "Completed", value: completedBooks },
-    { name: "Reading", value: readingBooks },
-    { name: "To Read", value: toReadBooks },
-  ];
-
-  const visibleStatusData = statusData.filter(
-    (item) => item.value > 0
-  );
-
-  const ratingData = Array.from(
-    { length: 7 },
-    (_, rating) => ({
-      rating: `${rating} stars`,
-      books: booksForSelectedYear.filter(
-        (book) => book.rating === rating
-      ).length,
-    })
-  );
-
-  const chartColours = [
-    "#16a34a",
-    "#2563eb",
-    "#f59e0b",
-  ];
+  const ratingData = Array.from({ length: MAX_RATING + 1 }, (_, rating) => ({
+    rating: rating === 0 ? "Unrated" : `${rating}★`,
+    books: booksForYear.filter((book) => book.rating === rating).length,
+  }));
 
   const handleGoalChange = (value: string) => {
     const nextGoal = Number(value);
 
-    if (Number.isNaN(nextGoal)) {
-      return;
-    }
+    if (Number.isNaN(nextGoal)) return;
 
-    setReadingGoals((previousGoals) => ({
-      ...previousGoals,
-      [selectedYear]: Math.max(1, nextGoal),
-    }));
+    setGoal(selectedYear, Math.max(1, Math.round(nextGoal)));
   };
 
   return (
-    <main className="container">
-      <div className="section-header">
+    <main className="page">
+      <div className="page-header">
         <div>
           <h2>Analytics</h2>
-          <p className="section-subtitle">
+          <p className="page-subtitle">
             View insights about your reading habits.
           </p>
         </div>
@@ -227,24 +146,14 @@ function Analytics({
               </p>
             </div>
 
-            <div className="analytics-goal-value">
-              {goalProgress}%
-            </div>
+            <div className="analytics-goal-value">{goalProgress}%</div>
           </div>
 
-          <div
-            className="goal-progress-track"
-            role="progressbar"
-            aria-label={`${selectedYear} reading goal progress`}
-            aria-valuemin={0}
-            aria-valuemax={100}
-            aria-valuenow={goalProgress}
-          >
-            <div
-              className="goal-progress-fill"
-              style={{ width: `${goalProgress}%` }}
-            />
-          </div>
+          <ProgressBar
+            value={goalProgress}
+            label={`${selectedYear} reading goal progress`}
+            size="large"
+          />
 
           <div className="analytics-goal-footer">
             <p className="goal-remaining">
@@ -257,118 +166,86 @@ function Analytics({
                 type="number"
                 min="1"
                 value={readingGoal}
-                onChange={(event) =>
-                  handleGoalChange(event.target.value)
-                }
+                onChange={(event) => handleGoalChange(event.target.value)}
               />
             </label>
           </div>
         </section>
 
-        <aside
-          className="year-selector"
-          aria-label="Analytics year"
-        >
+        <nav className="year-selector" aria-label="Analytics year">
           {availableYears.map((year) => (
             <button
               key={year}
               type="button"
-              className={
-                selectedYear === year ? "active" : ""
-              }
+              className={selectedYear === year ? "active" : ""}
+              aria-pressed={selectedYear === year}
               onClick={() => setSelectedYear(year)}
             >
               {year}
             </button>
           ))}
-        </aside>
+        </nav>
       </div>
 
       <div className="analytics-grid">
-        <div className="stat-card">
-          <h3>Total Books</h3>
-          <p>{totalBooks}</p>
-        </div>
-
-        <div className="stat-card">
-          <h3>Completed</h3>
-          <p>{completedBooks}</p>
-        </div>
-
-        <div className="stat-card">
-          <h3>Reading</h3>
-          <p>{readingBooks}</p>
-        </div>
-
-        <div className="stat-card">
-          <h3>To Read</h3>
-          <p>{toReadBooks}</p>
-        </div>
-
-        <div className="stat-card">
-          <h3>Average Rating</h3>
-          <p>{averageRating}/6</p>
-        </div>
-
-        <div className="stat-card">
-          <h3>Total Pages</h3>
-          <p>{totalPages}</p>
-        </div>
+        <StatCard label="Total Books" value={booksForYear.length} />
+        <StatCard label="Completed" value={completedBooks} />
+        <StatCard label="Reading" value={countByStatus(booksForYear, "Reading")} />
+        <StatCard label="To Read" value={countByStatus(booksForYear, "To Read")} />
+        <StatCard label="Average Rating" value={`${averageRating}/${MAX_RATING}`} />
+        <StatCard label="Total Pages" value={totalPages.toLocaleString()} />
       </div>
 
-      <div className="analytics-chart-card">
-        <h3>Reading Status — {selectedYear}</h3>
+      <section className="analytics-chart-card">
+        <div className="chart-header">
+          <h3>Reading Status</h3>
+          <span>{selectedYear}</span>
+        </div>
 
         <div className="chart-container">
-          <ResponsiveContainer width="100%" height={300}>
-            <PieChart>
-              <Pie
-                data={visibleStatusData}
-                dataKey="value"
-                nameKey="name"
-                cx="50%"
-                cy="50%"
-                outerRadius={100}
-              >
-                {visibleStatusData.map((_, index) => (
-                  <Cell
-                    key={index}
-                    fill={
-                      chartColours[
-                        index % chartColours.length
-                      ]
-                    }
-                  />
-                ))}
-              </Pie>
+          {statusData.length > 0 ? (
+            <ResponsiveContainer width="100%" height="100%">
+              <PieChart>
+                <Pie
+                  data={statusData}
+                  dataKey="value"
+                  nameKey="name"
+                  cx="50%"
+                  cy="50%"
+                  outerRadius={100}
+                  stroke="none"
+                />
 
-              <Tooltip />
-              <Legend />
-            </PieChart>
-          </ResponsiveContainer>
+                <Tooltip {...TOOLTIP_PROPS} />
+                <Legend />
+              </PieChart>
+            </ResponsiveContainer>
+          ) : (
+            <p className="chart-empty">No books for {selectedYear} yet.</p>
+          )}
         </div>
-      </div>
+      </section>
 
-      <div className="analytics-chart-card">
+      <section className="analytics-chart-card">
         <div className="chart-header">
           <h3>Monthly Reading Activity</h3>
           <span>{selectedYear}</span>
         </div>
 
         <div className="chart-container">
-          <ResponsiveContainer width="100%" height={300}>
+          <ResponsiveContainer width="100%" height="100%">
             <LineChart data={monthlyData}>
               <CartesianGrid strokeDasharray="3 3" />
               <XAxis dataKey="month" />
               <YAxis allowDecimals={false} />
-              <Tooltip />
+              <Tooltip {...TOOLTIP_PROPS} />
               <Legend />
 
               <Line
                 type="monotone"
                 dataKey="started"
                 name="Books Started"
-                stroke="#2563eb"
+                stroke={STATUS_COLOURS.Reading}
                 strokeWidth={3}
               />
 
@@ -376,35 +253,38 @@ function Analytics({
                 type="monotone"
                 dataKey="completed"
                 name="Books Completed"
-                stroke="#16a34a"
+                stroke={STATUS_COLOURS.Completed}
                 strokeWidth={3}
               />
             </LineChart>
           </ResponsiveContainer>
         </div>
-      </div>
+      </section>
 
-      <div className="analytics-chart-card">
-        <h3>Rating Distribution — {selectedYear}</h3>
+      <section className="analytics-chart-card">
+        <div className="chart-header">
+          <h3>Rating Distribution</h3>
+          <span>{selectedYear}</span>
+        </div>
 
         <div className="chart-container">
-          <ResponsiveContainer width="100%" height={300}>
+          <ResponsiveContainer width="100%" height="100%">
             <BarChart data={ratingData}>
               <CartesianGrid strokeDasharray="3 3" />
               <XAxis dataKey="rating" />
               <YAxis allowDecimals={false} />
-              <Tooltip />
+              <Tooltip {...TOOLTIP_PROPS} />
 
               <Bar
                 dataKey="books"
                 name="Books"
-                fill="#2563eb"
+                fill={STATUS_COLOURS.Reading}
                 radius={[8, 8, 0, 0]}
               />
             </BarChart>
           </ResponsiveContainer>
         </div>
-      </div>
+      </section>
     </main>
   );
 }

@@ -1,79 +1,76 @@
-import type { Book } from "../types/book";
-import BookCard from "../components/BookCard";
+import { useMemo, useState } from "react";
+import { BOOK_STATUSES, type Book } from "../types/book";
+import {
+  countByStatus,
+  filterAndSortBooks,
+  getBookYear,
+  percentage,
+  type SortOption,
+  type StatusFilter,
+} from "../utils/books";
+import BookPin from "../components/BookPin";
+import ChipBar from "../components/ChipBar";
+import { PlusIcon } from "../components/Icons";
+import ProgressBar from "../components/ProgressBar";
+import StatCard from "../components/StatCard";
+
+const STATUS_OPTIONS: StatusFilter[] = ["All", ...BOOK_STATUSES];
 
 interface LibraryProps {
-  filteredBooks: Book[];
-
-  librarySearch: string;
-  setLibrarySearch: (value: string) => void;
-
-  statusFilter: string;
-  setStatusFilter: (value: string) => void;
-
-  sortOption: string;
-  setSortOption: (value: string) => void;
-
+  books: Book[];
+  search: string;
+  isLoading: boolean;
+  readingGoal: number;
   onAddBook: () => void;
   onEditBook: (book: Book) => void;
-  onDeleteBook: (id: number) => void;
+  onDeleteBook: (book: Book) => void;
 }
 
 function Library({
-  filteredBooks,
-  librarySearch,
-  setLibrarySearch,
-  statusFilter,
-  setStatusFilter,
-  sortOption,
-  setSortOption,
+  books,
+  search,
+  isLoading,
+  readingGoal,
   onAddBook,
   onEditBook,
   onDeleteBook,
 }: LibraryProps) {
-  return (
-    <main className="container">
-      <div className="section-header">
-        <div>
-          <h2>Library</h2>
-          <p className="section-subtitle">
-            Browse and manage your full collection.
-          </p>
-        </div>
+  const [status, setStatus] = useState<StatusFilter>("All");
+  const [sort, setSort] = useState<SortOption>("Title");
 
-        <button onClick={onAddBook}>Add Book</button>
-      </div>
+  const visibleBooks = useMemo(
+    () => filterAndSortBooks(books, { search, status, sort }),
+    [books, search, status, sort]
+  );
 
-      <div className="library-controls">
-        <input
-          type="text"
-          placeholder="Search by title or author..."
-          value={librarySearch}
-          onChange={(e) => setLibrarySearch(e.target.value)}
-        />
+  const currentYear = new Date().getFullYear();
 
-        <select
-          value={statusFilter}
-          onChange={(e) => setStatusFilter(e.target.value)}
-        >
-          <option value="All">All statuses</option>
-          <option value="To Read">To Read</option>
-          <option value="Reading">Reading</option>
-          <option value="Completed">Completed</option>
-        </select>
+  // The goal only counts books finished this year, matching the Analytics page.
+  const completedThisYear = books.filter(
+    (book) => book.status === "Completed" && getBookYear(book) === currentYear
+  ).length;
 
-        <select
-          value={sortOption}
-          onChange={(e) => setSortOption(e.target.value)}
-        >
-          <option value="Title">Sort by title</option>
-          <option value="Author">Sort by author</option>
-          <option value="Rating">Sort by rating</option>
-        </select>
-      </div>
+  const goalProgress = percentage(completedThisYear, readingGoal);
 
-      <div className="books-container">
-        {filteredBooks.map((book) => (
-          <BookCard
+  const renderBooks = () => {
+    if (isLoading) {
+      return <p className="feed-status">Loading your library…</p>;
+    }
+
+    if (visibleBooks.length === 0) {
+      return (
+        <p className="empty-state">
+          {books.length === 0
+            ? "Your library is empty. Add your first book, or save one from your picks."
+            : "No books match your search."}
+        </p>
+      );
+    }
+
+    return (
+      <div className="masonry">
+        {visibleBooks.map((book) => (
+          <BookPin
             key={book.id}
             book={book}
             onEdit={onEditBook}
@@ -81,6 +78,62 @@ function Library({
           />
         ))}
       </div>
+    );
+  };
+
+  return (
+    <main className="page">
+      <div className="page-header">
+        <div>
+          <h2>Your library</h2>
+          <p className="page-subtitle">Everything you've read, are reading, and want to read.</p>
+        </div>
+
+        <button type="button" className="btn btn-with-icon" onClick={onAddBook}>
+          <PlusIcon />
+          Add book
+        </button>
+      </div>
+
+      <section className="stats-strip">
+        <StatCard label="Total books" value={books.length} />
+        <StatCard label="Reading" value={countByStatus(books, "Reading")} />
+        <StatCard label="Completed" value={countByStatus(books, "Completed")} />
+
+        <div className="stat-card goal-card">
+          <h3>{currentYear} goal</h3>
+          <p>
+            {completedThisYear}
+            <span className="goal-of"> / {readingGoal}</span>
+          </p>
+          <ProgressBar
+            value={goalProgress}
+            label={`${currentYear} reading goal progress`}
+          />
+        </div>
+      </section>
+
+      <div className="library-toolbar">
+        <ChipBar
+          options={STATUS_OPTIONS}
+          active={status}
+          onSelect={setStatus}
+          label="Filter by status"
+        />
+
+        <select
+          className="sort-select"
+          aria-label="Sort books"
+          value={sort}
+          onChange={(event) => setSort(event.target.value as SortOption)}
+        >
+          <option value="Title">Sort by title</option>
+          <option value="Author">Sort by author</option>
+          <option value="Rating">Sort by rating</option>
+        </select>
+      </div>
+
+      {renderBooks()}
     </main>
   );
 }

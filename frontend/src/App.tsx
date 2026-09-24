@@ -1,302 +1,283 @@
-import { useEffect, useState } from "react";
+import { lazy, Suspense, useEffect, useState } from "react";
 import "./App.css";
-import type { Book, SearchResult } from "./types/book";
-import Navbar from "./components/Navbar";
+import {
+  addRecommendationToLibrary,
+  createBook,
+  deleteBook,
+  dismissRecommendation,
+  errorMessage,
+  fetchBooks,
+  fetchRecommendationEngine,
+  fetchRecommendations,
+  refreshRecommendations,
+  updateBook,
+} from "./api";
+import type {
+  Book,
+  BookInput,
+  Recommendation,
+  RecommendationEngine,
+} from "./types/book";
+import { useReadingGoals } from "./hooks/useReadingGoals";
+import { useTheme } from "./hooks/useTheme";
 import BookModal from "./components/BookModal";
-import Dashboard from "./pages/Dashboard";
+import RecommendationModal from "./components/RecommendationModal";
+import Sidebar, { type Page } from "./components/Sidebar";
+import TopBar from "./components/TopBar";
+import Home from "./pages/Home";
 import Library from "./pages/Library";
-import Analytics from "./pages/Analytics";
+
+// Analytics pulls in the charting library, so only load it when it's opened.
+const Analytics = lazy(() => import("./pages/Analytics"));
+
+const SEARCH_PLACEHOLDERS: Record<Page, string> = {
+  Home: "Search your picks by title, author or genre",
+  Library: "Search your library by title or author",
+  Analytics: "Search",
+};
+
+const NOTICE_DURATION_MS = 3000;
 
 function App() {
+  const [activePage, setActivePage] = useState<Page>("Home");
+  const [search, setSearch] = useState("");
+  const [error, setError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
+
   const [books, setBooks] = useState<Book[]>([]);
-  const [showModal, setShowModal] = useState(false);
-  const [editingBookId, setEditingBookId] = useState<number | null>(null);
+  const [isLoadingBooks, setIsLoadingBooks] = useState(true);
 
-  const [searchQuery, setSearchQuery] = useState("");
-  const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
+  const [recommendations, setRecommendations] = useState<Recommendation[]>([]);
+  const [isLoadingRecommendations, setIsLoadingRecommendations] = useState(true);
+  const [isGenerating, setIsGenerating] = useState(false);
+  const [recommendationError, setRecommendationError] = useState<string | null>(null);
+  const [engine, setEngine] = useState<RecommendationEngine>("free");
+  const [openRecommendation, setOpenRecommendation] = useState<Recommendation | null>(null);
 
-  const [librarySearch, setLibrarySearch] = useState("");
-  const [statusFilter, setStatusFilter] = useState("All");
-  const [sortOption, setSortOption] = useState("Title");
+  const [isBookModalOpen, setIsBookModalOpen] = useState(false);
+  const [editingBook, setEditingBook] = useState<Book | null>(null);
 
-  const [activePage, setActivePage] = useState("Dashboard");
-  const currentYear = new Date().getFullYear();
-
-  const [readingGoals, setReadingGoals] = useState<
-    Record<number, number>
-  >(() => {
-    const savedGoals = localStorage.getItem("readingGoals");
-
-    if (savedGoals) {
-      try {
-        return JSON.parse(savedGoals);
-      } catch {
-        return { [currentYear]: 20 };
-      }
-    }
-
-    return { [currentYear]: 20 };
-  });
+  const { goals, getGoal, setGoal } = useReadingGoals();
+  const { theme, toggleTheme } = useTheme();
 
   useEffect(() => {
-  localStorage.setItem(
-    "readingGoals",
-    JSON.stringify(readingGoals)
-  );
-}, [readingGoals]);
+    fetchBooks()
+      .then(setBooks)
+      .catch((err) => setError(errorMessage(err)))
+      .finally(() => setIsLoadingBooks(false));
 
-  const [newBook, setNewBook] = useState({
-    title: "",
-    author: "",
-    status: "To Read",
-    pages: "",
-    current_page: "",
-    rating: "",
-    cover: "",
-    started_at: "",
-    completed_at: "",
-  });
+    fetchRecommendations()
+      .then(setRecommendations)
+      .catch((err) => setRecommendationError(errorMessage(err)))
+      .finally(() => setIsLoadingRecommendations(false));
 
-  useEffect(() => {
-    fetch("http://127.0.0.1:8000/books")
-      .then((response) => response.json())
-      .then((data) => setBooks(data));
+    fetchRecommendationEngine()
+      .then(({ engine }) => setEngine(engine))
+      .catch(() => {
+        // Not critical: the default "free" wording is shown instead.
+      });
   }, []);
 
-  const totalBooks = books.length;
-  const readingBooks = books.filter((book) => book.status === "Reading").length;
-  const completedBooks = books.filter(
-    (book) => book.status === "Completed"
-  ).length;
+  useEffect(() => {
+    if (!notice) return;
 
-  const resetBookForm = () => {
-    setEditingBookId(null);
-    setNewBook({
-      title: "",
-      author: "",
-      status: "To Read",
-      pages: "",
-      current_page: "",
-      rating: "",
-      cover: "",
-      started_at: "",
-      completed_at: "",
-    });
-    setSearchQuery("");
-    setSearchResults([]);
+    const timeout = setTimeout(() => setNotice(null), NOTICE_DURATION_MS);
+    return () => clearTimeout(timeout);
+  }, [notice]);
+
+  const handleNavigate = (page: Page) => {
+    setActivePage(page);
+    setSearch("");
   };
 
-  const handleOpenAddBook = () => {
-    resetBookForm();
-    setShowModal(true);
+  // ---------- Books ----------
+
+  const openAddModal = () => {
+    setEditingBook(null);
+    setIsBookModalOpen(true);
   };
 
-  const handleAddBook = () => {
-    const bookToAdd = {
-      title: newBook.title,
-      author: newBook.author,
-      status: newBook.status,
-
-      pages: newBook.pages ? Number(newBook.pages) : 0,
-      current_page: newBook.current_page
-      ? Number(newBook.current_page)
-      : 0,
-
-      rating: Math.min(Number(newBook.rating), 6),
-      cover: newBook.cover,
-      started_at: newBook.started_at || null,
-      completed_at: newBook.completed_at || null,
-    };
-
-    fetch("http://127.0.0.1:8000/books", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify(bookToAdd),
-    })
-      .then((response) => response.json())
-      .then((createdBook) => {
-        setBooks((currentBooks) => [...currentBooks, createdBook]);
-        resetBookForm();
-        setShowModal(false);
-      });
+  const openEditModal = (book: Book) => {
+    setEditingBook(book);
+    setIsBookModalOpen(true);
   };
 
-  const handleUpdateBook = () => {
-    if (editingBookId === null) return;
-
-    const updatedBook = {
-      title: newBook.title,
-      author: newBook.author,
-      status: newBook.status,
-
-      pages: newBook.pages ? Number(newBook.pages) : 0,
-      current_page: newBook.current_page
-        ? Number(newBook.current_page)
-        : 0,
-
-      rating: Math.min(Number(newBook.rating), 6),
-      cover: newBook.cover,
-      started_at: newBook.started_at || null,
-      completed_at: newBook.completed_at || null,
-    };
-
-    fetch(`http://127.0.0.1:8000/books/${editingBookId}`, {
-      method: "PUT",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify(updatedBook),
-    })
-      .then((response) => response.json())
-      .then((savedBook) => {
-        setBooks((currentBooks) =>
-          currentBooks.map((book) =>
-            book.id === editingBookId ? savedBook : book
-          )
-        );
-
-        resetBookForm();
-        setShowModal(false);
-      });
+  const closeBookModal = () => {
+    setIsBookModalOpen(false);
+    setEditingBook(null);
   };
 
-  const handleEditClick = (book: Book) => {
-    setEditingBookId(book.id);
-
-    setNewBook({
-      title: book.title,
-      author: book.author,
-      status: book.status,
-      pages: String(book.pages),
-      current_page: String(book.current_page ?? 0),
-      rating: String(book.rating),
-      cover: book.cover,
-      started_at: book.started_at ? book.started_at.slice(0, 10) : "",
-      completed_at: book.completed_at ? book.completed_at.slice(0, 10) : "",
-    });
-
-    setSearchQuery(book.title);
-    setSearchResults([]);
-    setShowModal(true);
-  };
-
-  const handleDeleteBook = (id: number) => {
-    fetch(`http://127.0.0.1:8000/books/${id}`, {
-      method: "DELETE",
-    }).then(() => {
-      setBooks((currentBooks) =>
-        currentBooks.filter((book) => book.id !== id)
+  // Errors are left to propagate so the modal can show them next to the form.
+  const handleSaveBook = async (input: BookInput) => {
+    if (editingBook) {
+      const saved = await updateBook(editingBook.id, input);
+      setBooks((current) =>
+        current.map((book) => (book.id === saved.id ? saved : book))
       );
-    });
+    } else {
+      const created = await createBook(input);
+      setBooks((current) => [...current, created]);
+    }
+
+    closeBookModal();
   };
 
-  const handleSearchBooks = () => {
-    if (!searchQuery.trim()) return;
+  const handleDeleteBook = async (book: Book) => {
+    if (!window.confirm(`Delete "${book.title}" from your library?`)) return;
 
-    fetch(
-      `https://openlibrary.org/search.json?title=${encodeURIComponent(
-        searchQuery
-      )}&limit=5`
-    )
-      .then((response) => response.json())
-      .then((data) => setSearchResults(data.docs));
+    try {
+      await deleteBook(book.id);
+      setBooks((current) => current.filter((b) => b.id !== book.id));
+    } catch (err) {
+      setError(errorMessage(err));
+    }
   };
 
-  const filteredBooks = books
-    .filter((book) => {
-      const matchesSearch =
-        book.title.toLowerCase().includes(librarySearch.toLowerCase()) ||
-        book.author.toLowerCase().includes(librarySearch.toLowerCase());
+  // ---------- Recommendations ----------
 
-      const matchesStatus =
-        statusFilter === "All" || book.status === statusFilter;
+  const removeRecommendation = (id: number) => {
+    setRecommendations((current) => current.filter((r) => r.id !== id));
+    setOpenRecommendation((current) => (current?.id === id ? null : current));
+  };
 
-      return matchesSearch && matchesStatus;
-    })
-    .sort((a, b) => {
-      if (sortOption === "Title") {
-        return a.title.localeCompare(b.title);
-      }
+  const handleRefreshRecommendations = async () => {
+    setIsGenerating(true);
+    setRecommendationError(null);
 
-      if (sortOption === "Author") {
-        return a.author.localeCompare(b.author);
-      }
+    try {
+      setRecommendations(await refreshRecommendations());
+    } catch (err) {
+      setRecommendationError(errorMessage(err));
+    } finally {
+      setIsGenerating(false);
+    }
+  };
 
-      if (sortOption === "Rating") {
-        return b.rating - a.rating;
-      }
+  const handleSaveRecommendation = async (recommendation: Recommendation) => {
+    try {
+      const book = await addRecommendationToLibrary(recommendation.id);
+      setBooks((current) => [...current, book]);
+      removeRecommendation(recommendation.id);
+      setNotice(`Saved "${book.title}" to your library`);
+    } catch (err) {
+      setError(errorMessage(err));
+    }
+  };
 
-      return 0;
-    });
+  const handleDismissRecommendation = async (recommendation: Recommendation) => {
+    // Hide it straight away; put it back if the server call fails.
+    const previous = recommendations;
+    removeRecommendation(recommendation.id);
+
+    try {
+      await dismissRecommendation(recommendation.id);
+    } catch (err) {
+      setRecommendations(previous);
+      setError(errorMessage(err));
+    }
+  };
+
+  // ---------- Rendering ----------
+
+  const renderPage = () => {
+    switch (activePage) {
+      case "Home":
+        return (
+          <Home
+            recommendations={recommendations}
+            engine={engine}
+            search={search}
+            hasBooks={books.length > 0}
+            isLoading={isLoadingRecommendations}
+            isGenerating={isGenerating}
+            error={recommendationError}
+            onRefresh={handleRefreshRecommendations}
+            onOpen={setOpenRecommendation}
+            onSave={handleSaveRecommendation}
+            onDismiss={handleDismissRecommendation}
+          />
+        );
+      case "Library":
+        return (
+          <Library
+            books={books}
+            search={search}
+            isLoading={isLoadingBooks}
+            readingGoal={getGoal(new Date().getFullYear())}
+            onAddBook={openAddModal}
+            onEditBook={openEditModal}
+            onDeleteBook={handleDeleteBook}
+          />
+        );
+      case "Analytics":
+        return (
+          <Suspense fallback={<p className="feed-status">Loading analytics…</p>}>
+            <Analytics
+              books={books}
+              readingGoals={goals}
+              getGoal={getGoal}
+              setGoal={setGoal}
+            />
+          </Suspense>
+        );
+    }
+  };
 
   return (
     <div className="app">
-      <Navbar
+      <Sidebar
         activePage={activePage}
-        setActivePage={setActivePage}
+        onNavigate={handleNavigate}
+        onAddBook={openAddModal}
+        theme={theme}
+        onToggleTheme={toggleTheme}
       />
 
-      {activePage === "Dashboard" && (
-        <Dashboard
-          books={books}
-          filteredBooks={filteredBooks}
-          totalBooks={totalBooks}
-          readingBooks={readingBooks}
-          completedBooks={completedBooks}
-          readingGoal={readingGoals[currentYear] ?? 20}
-          librarySearch={librarySearch}
-          setLibrarySearch={setLibrarySearch}
-          statusFilter={statusFilter}
-          setStatusFilter={setStatusFilter}
-          sortOption={sortOption}
-          setSortOption={setSortOption}
-          onAddBook={handleOpenAddBook}
-          onEditBook={handleEditClick}
-          onDeleteBook={handleDeleteBook}
-        />
-      )}
+      <div className="app-main">
+        {activePage !== "Analytics" && (
+          <TopBar
+            search={search}
+            onSearchChange={setSearch}
+            placeholder={SEARCH_PLACEHOLDERS[activePage]}
+          />
+        )}
 
-      {activePage === "Library" && (
-        <Library
-          filteredBooks={filteredBooks}
-          librarySearch={librarySearch}
-          setLibrarySearch={setLibrarySearch}
-          statusFilter={statusFilter}
-          setStatusFilter={setStatusFilter}
-          sortOption={sortOption}
-          setSortOption={setSortOption}
-          onAddBook={handleOpenAddBook}
-          onEditBook={handleEditClick}
-          onDeleteBook={handleDeleteBook}
-        />
-      )}
-
-      {activePage === "Analytics" && (
-        <Analytics books={books} 
-                  readingGoals={readingGoals}
-                  setReadingGoals={setReadingGoals}
-                />
-      )}
-
-      {showModal && (
-        <BookModal
-          editingBookId={editingBookId}
-          newBook={newBook}
-          setNewBook={setNewBook}
-          searchQuery={searchQuery}
-          setSearchQuery={setSearchQuery}
-          searchResults={searchResults}
-          setSearchResults={setSearchResults}
-          onSearch={handleSearchBooks}
-          onAdd={handleAddBook}
-          onUpdate={handleUpdateBook}
-          onClose={() => setShowModal(false)}
-        />
-      )}
+        {error && (
+          <div className="error-banner" role="alert">
+            <span>{error}</span>
+            <button type="button" onClick={() => setError(null)}>
+              Dismiss
+            </button>
           </div>
-        );
-      }
+        )}
+
+        {renderPage()}
+      </div>
+
+      {openRecommendation && (
+        <RecommendationModal
+          recommendation={openRecommendation}
+          onSave={handleSaveRecommendation}
+          onDismiss={handleDismissRecommendation}
+          onClose={() => setOpenRecommendation(null)}
+        />
+      )}
+
+      {isBookModalOpen && (
+        <BookModal
+          book={editingBook}
+          onSave={handleSaveBook}
+          onClose={closeBookModal}
+        />
+      )}
+
+      {notice && (
+        <div className="toast" role="status">
+          {notice}
+        </div>
+      )}
+    </div>
+  );
+}
 
 export default App;
