@@ -44,10 +44,6 @@ cp .env.example .env           # then set DATABASE_URL
 uvicorn main:app --reload
 ```
 
-Recommendations work for free out of the box. For AI picks from Claude instead, add `ANTHROPIC_API_KEY` to `backend/.env` (keys and credits at https://console.anthropic.com) and restart the backend.
-
-The API runs at http://127.0.0.1:8000, with interactive docs at http://127.0.0.1:8000/docs. Tables are created automatically on first start.
-
 ### Frontend
 
 ```bash
